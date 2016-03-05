@@ -91,7 +91,8 @@ public class StopWatch {
         Duration suspendedDuration = Duration.between(suspendedAt, resumedAt);
         suspendedAt = null;
         resumedAt = Instant.now();
-        System.out.printf("during %s from suspended. now resuming at %s%n", suspendedDuration, resumedAt);
+        System.out.printf("during %s from suspended. now resuming at %s%n",
+                suspendedDuration, resumedAt);
     }
 
     /**
