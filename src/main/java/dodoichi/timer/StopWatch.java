@@ -17,6 +17,7 @@ public class StopWatch {
 
     private Duration totalDuration;
     private Instant startedAt;
+    private Instant originalStartedAt;
     private Instant suspendedAt;
     private Instant resumedAt;
 
@@ -27,15 +28,18 @@ public class StopWatch {
     /**
      * Start the stopwatch.
      * If this stopwatch has been already started, {@link IllegalStateException} will be thrown.
+     * You can start again if the stopwatch has been stopped.
      *
      * @throws IllegalStateException if the stopwatch has been already started.
      */
     public void start() {
-        if (totalDuration.compareTo(Duration.ZERO) > 0) {
+        if (isStarted()) {
             throw new IllegalStateException("already started");
         }
 
         startedAt = Instant.now();
+        originalStartedAt = Instant.from(startedAt);
+        totalDuration = Duration.ZERO;
         System.out.printf("starting at %s%n", startedAt);
     }
 
@@ -51,17 +55,16 @@ public class StopWatch {
             throw new IllegalStateException("not started");
         }
 
-        Instant i4 = Instant.now();
+        Instant stoppedAt = Instant.now();
         Duration lastDuration;
-        if (isResumed()) {
-            lastDuration = Duration.between(resumedAt, i4);
-        } else if (isSuspended()) {
+        if (isSuspended()) {
             lastDuration = Duration.between(startedAt, suspendedAt);
         } else {
-            lastDuration = Duration.between(startedAt, i4);
+            lastDuration = Duration.between(startedAt, stoppedAt);
         }
         totalDuration = totalDuration.plus(lastDuration);
-        System.out.printf("stopped at %s. total duration is %s%n", i4, totalDuration);
+        reset();
+        System.out.printf("stopped at %s. total duration is %s%n", stoppedAt, totalDuration);
     }
 
     /**
@@ -73,10 +76,10 @@ public class StopWatch {
     public void suspend() {
         if (!isStarted()) {
             throw new IllegalStateException("not started");
-        }
-        if (isSuspended()) {
+        } else if (isSuspended()) {
             throw new IllegalStateException("already suspended.");
         }
+
         suspendedAt = Instant.now();
         totalDuration = totalDuration.plus(Duration.between(startedAt, suspendedAt));
         System.out.printf("suspended at %s. current duration is %s%n", suspendedAt, totalDuration);
@@ -97,7 +100,7 @@ public class StopWatch {
         resumedAt = Instant.now();
         Duration suspendedDuration = Duration.between(suspendedAt, resumedAt);
         suspendedAt = null;
-        resumedAt = Instant.now();
+        startedAt = Instant.from(resumedAt);
         System.out.printf("during %s from suspended. now resuming at %s%n",
                 suspendedDuration, resumedAt);
     }
@@ -109,16 +112,20 @@ public class StopWatch {
         startedAt = null;
         suspendedAt = null;
         resumedAt = null;
-        totalDuration = Duration.ZERO;
     }
 
     /**
      * Return the timing when the stopwatch started.
+     * If the stopwatch has not been started {@link IllegalStateException} will be thrown.
      *
      * @return the timing when the stopwatch started.
+     * @throws IllegalStateException if the stopwatch has not been started yet.
      */
     public Temporal getStartTime() {
-        return startedAt;
+        if (originalStartedAt == null) {
+            throw new IllegalStateException("not started");
+        }
+        return originalStartedAt;
     }
 
     /**
@@ -130,11 +137,7 @@ public class StopWatch {
      */
     public Duration getDuration() {
         Duration currentTotalDuration = totalDuration;
-        if (isSuspended()) {
-            currentTotalDuration = totalDuration.plus(Duration.between(startedAt, suspendedAt));
-        } else if (isResumed()) {
-            currentTotalDuration = totalDuration.plus(Duration.between(resumedAt, Instant.now()));
-        } else if (isStarted() && !isStopped()) {
+        if (isStarted() && (!isSuspended() || !isStopped())) {
             currentTotalDuration = totalDuration.plus(Duration.between(startedAt, Instant.now()));
         }
         return currentTotalDuration;
@@ -146,10 +149,6 @@ public class StopWatch {
 
     private boolean isSuspended() {
         return suspendedAt != null;
-    }
-
-    private boolean isResumed() {
-        return resumedAt != null;
     }
 
     private boolean isStopped() {
