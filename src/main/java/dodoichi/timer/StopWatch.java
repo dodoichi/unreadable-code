@@ -36,7 +36,7 @@ public class StopWatch {
         }
 
         startedAt = Instant.now();
-        System.out.printf("starting at %s%n",startedAt);
+        System.out.printf("starting at %s%n", startedAt);
     }
 
     /**
