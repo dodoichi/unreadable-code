@@ -1,6 +1,14 @@
 package dodoichi.timer;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A countdown timer.
@@ -9,46 +17,84 @@ import java.util.concurrent.TimeUnit;
  */
 public class CountdownTimer {
 
-    private long totalMilliSeconds = 0;
+    private AtomicLong totalMilliSeconds;
+    private Instant startTime;
+    private ScheduledFuture<Long> future;
+    private ScheduledExecutorService executor;
 
-    private long timePerUnit;
-    private TimeUnit unit;
-
-    /**
-     * timePerUnit represents dependent on {@link TimeUnit}.
-     * For example, if 10L and {@link TimeUnit#SECONDS} are passed,
-     * 10L means "Ten seconds".
-     *
-     * @param timePerUnit the amount of time.
-     * @param unit One of {@link TimeUnit} values.
-     */
-    public CountdownTimer(long timePerUnit, TimeUnit unit) {
-        this.timePerUnit = timePerUnit;
-        this.unit = unit;
+    public CountdownTimer() {
+        totalMilliSeconds = new AtomicLong(0);
     }
 
     /**
      * Set how much time to wait.
+     * If total milliseconds becomes minus, the timer throws {@link IllegalArgumentException}.
      *
-     * @param milliSeconds the unit is always milliSec.
+     * @param hours
+     *            long value of hours
+     * @param minutes
+     *            long value of minutes
+     * @param seconds
+     *            long value of seconds
+     *
+     * @throws IllegalArgumentException
+     *             if total time is minus value.
      */
-    public void addMilliSeconds(long milliSeconds) {
-        this.totalMilliSeconds = milliSeconds;
+    public void set(long hours, long minutes, long seconds) {
+        Duration total = Duration.ofHours(hours)
+                .plus(Duration.ofMinutes(minutes)
+                        .plus(Duration.ofSeconds(seconds)));
+        long millis = total.toMillis();
+        if (millis < 0) {
+            throw new IllegalArgumentException("couldn't set minus value");
+        }
+        totalMilliSeconds = new AtomicLong(millis);
+    }
+
+    public Object getTime() {
+        return totalMilliSeconds.get();
     }
 
     /**
-     * Wait until countdown reaches 0.
+     * Start this timer.
+     * Throw {@link IllegalStateException} if the timer is set ZERO.
      *
-     * @throws InterruptedException if {@link TimeUnit#timedWait(Object, long)}
-     *                              throws {@link InterruptedException}.
+     * @return ZERO if ends normally
+     * @throws IllegalStateException
+     *             if the timer is set ZERO.
      */
-    public synchronized void countdown() throws InterruptedException {
-        while (totalMilliSeconds > 0) {
-            long minus = unit.convert(timePerUnit, unit);
-            unit.timedWait(this, minus);
-            totalMilliSeconds -= minus;
-            System.out.println(totalMilliSeconds / 1000);
+    public Long start() {
+        if (totalMilliSeconds.get() == 0L) {
+            throw new IllegalStateException("Timer is set ZERO");
+        }
+
+        startTime = Instant.now();
+        executor = Executors.newSingleThreadScheduledExecutor();
+
+        future = executor.schedule(new Callable<Long>() {
+            @Override
+            public Long call() throws Exception {
+                if (Thread.interrupted()) {
+                    throw new InterruptedException();
+                }
+                return getDuration();
+            }
+        }, totalMilliSeconds.get(),
+                TimeUnit.MILLISECONDS);
+
+        executor.shutdown();
+
+        try {
+            return future.get();
+        } catch (InterruptedException e) {
+            return getDuration();
+        } catch (Exception e) {
+            return null;
         }
     }
 
+    private Long getDuration() {
+        Duration duration = Duration.between(startTime, Instant.now());
+        return totalMilliSeconds.get() - (duration.get(ChronoUnit.SECONDS) * 1000);
+    }
 }
