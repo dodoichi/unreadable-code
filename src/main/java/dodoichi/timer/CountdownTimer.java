@@ -56,11 +56,11 @@ public class CountdownTimer {
      * Start this timer.
      * Throw {@link IllegalStateException} if the timer is set ZERO.
      *
-     * @return ZERO if ends normally
+     * @return {@link ScheduledFuture}.
      * @throws IllegalStateException
      *             if the timer is set ZERO.
      */
-    public Long start() {
+    public ScheduledFuture<Long> start() {
         if (totalMilliSeconds.get() == 0L) {
             throw new IllegalStateException("Timer is set ZERO");
         }
@@ -73,11 +73,7 @@ public class CountdownTimer {
 
         executor.shutdown();
 
-        try {
-            return future.get();
-        } catch (Exception e) {
-            return null;
-        }
+        return future;
     }
 
     private Long getDuration() throws InterruptedException {
@@ -87,4 +83,12 @@ public class CountdownTimer {
         Duration duration = Duration.between(startTime, Instant.now());
         return totalMilliSeconds.get() - (duration.get(ChronoUnit.SECONDS) * 1000);
     }
+
+    /**
+     * Stop the timer.
+     */
+    public void stop(ScheduledFuture<Long> future) {
+        future.cancel(true);
+    }
+
 }

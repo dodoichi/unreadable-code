@@ -5,6 +5,10 @@ import static org.junit.Assert.assertThat;
 
 import org.junit.Test;
 
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledFuture;
+
 public class CountdownTimerTest {
 
     @Test
@@ -48,12 +52,24 @@ public class CountdownTimerTest {
      * if argument is null, timer throws NullPointerException.
      */
     @Test
-    public void endNormally() {
+    public void endNormally() throws InterruptedException, ExecutionException {
         CountdownTimer timer = new CountdownTimer();
         timer.set(0, 0, 5);
+        ScheduledFuture<Long> future = timer.start();
         assertThat("returns ZERO",
-                timer.start(),
+                future.get(),
                 equalTo(0L));
+    }
+
+    @Test(expected = CancellationException.class)
+    public void stopTimer() throws InterruptedException, ExecutionException {
+        CountdownTimer timer = new CountdownTimer();
+        timer.set(0, 0, 3);
+        ScheduledFuture<Long> future = timer.start();
+        timer.stop(future);
+        assertThat("stop",
+                future.get(),
+                equalTo(3L));
     }
 
 }
